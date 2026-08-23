@@ -1,0 +1,3 @@
+python-dotenv
+anthropic
+imapclient  # or google-api-python-client if using Gmail API

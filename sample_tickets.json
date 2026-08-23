@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "title": "No internet connection",
+    "description": "User is connected to Wi-Fi but websites will not load. Other employees are not affected."
+  },
+  {
+    "id": 2,
+    "title": "Teams camera not working",
+    "description": "User joined a Microsoft Teams meeting but their camera is not available."
+  },
+  {
+    "id": 3,
+    "title": "Computer running slowly",
+    "description": "User reports their Windows laptop has become extremely slow since this morning."
+  }
+]
