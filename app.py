@@ -1,4 +1,44 @@
+import json
 import ollama
+
+
+TICKET_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "category": {
+            "type": "string"
+        },
+        "priority": {
+            "type": "string",
+            "enum": ["Low", "Medium", "High", "Critical"]
+        },
+        "likely_causes": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "follow_up_questions": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "troubleshooting_steps": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        }
+    },
+    "required": [
+        "category",
+        "priority",
+        "likely_causes",
+        "follow_up_questions",
+        "troubleshooting_steps"
+    ]
+}
 
 
 def get_it_support_response(ticket_text):
@@ -9,12 +49,9 @@ def get_it_support_response(ticket_text):
                 "role": "system",
                 "content": (
                     "You are an IT support assistant. "
-                    "Analyze the user's support ticket and provide a concise response with: "
-                    "1. Issue category, "
-                    "2. Priority level, "
-                    "3. Likely causes, "
-                    "4. Follow-up questions, and "
-                    "5. Troubleshooting steps."
+                    "Analyze the support ticket and return only the information "
+                    "required by the provided JSON schema. "
+                    "Do not invent facts that are not supported by the ticket."
                 ),
             },
             {
@@ -22,9 +59,36 @@ def get_it_support_response(ticket_text):
                 "content": ticket_text,
             },
         ],
+        format=TICKET_SCHEMA,
+        options={
+            "temperature": 0
+        }
     )
 
-    return response["message"]["content"]
+    return json.loads(response["message"]["content"])
+
+
+def display_analysis(analysis):
+    print("\nIT SUPPORT ANALYSIS")
+    print("-------------------")
+
+    print(f"\nCategory: {analysis['category']}")
+    print(f"Priority: {analysis['priority']}")
+
+    print("\nLikely Causes:")
+    for cause in analysis["likely_causes"]:
+        print(f"- {cause}")
+
+    print("\nFollow-up Questions:")
+    for question in analysis["follow_up_questions"]:
+        print(f"- {question}")
+
+    print("\nTroubleshooting Steps:")
+    for number, step in enumerate(
+        analysis["troubleshooting_steps"],
+        start=1
+    ):
+        print(f"{number}. {step}")
 
 
 def main():
@@ -37,18 +101,17 @@ def main():
         print("\nError: Ticket cannot be empty.")
         return
 
-    print("\nAnalyzing ticket...\n")
+    print("\nAnalyzing ticket...")
 
     try:
-        response = get_it_support_response(ticket)
-        print(response)
+        analysis = get_it_support_response(ticket)
+        display_analysis(analysis)
+
+    except json.JSONDecodeError:
+        print("\nError: The model returned invalid JSON.")
 
     except Exception as error:
-        print(f"Error communicating with Ollama: {error}")
-        print(
-            "\nMake sure Ollama is running and that you have downloaded "
-            "the llama3 model with: ollama run llama3"
-        )
+        print(f"\nError communicating with Ollama: {error}")
 
 
 if __name__ == "__main__":
