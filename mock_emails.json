@@ -1,0 +1,32 @@
+[
+  {
+    "id": "MSG-001",
+    "sender": "alex@example.com",
+    "subject": "Cannot connect to VPN",
+    "body": "My VPN says authentication failed, but I can sign in to Microsoft 365 normally."
+  },
+  {
+    "id": "MSG-002",
+    "sender": "jamie@example.com",
+    "subject": "Suspicious Microsoft login email",
+    "body": "I received an unexpected email asking me to sign in to Microsoft 365 using a link. I have not clicked the link."
+  },
+  {
+    "id": "MSG-003",
+    "sender": "sam@example.com",
+    "subject": "Office printer offline",
+    "body": "The accounting printer shows as offline on my Windows computer. Other employees are able to print."
+  },
+  {
+    "id": "MSG-004",
+    "sender": "taylor@example.com",
+    "subject": "Laptop running very slowly",
+    "body": "My Windows laptop has been extremely slow since this morning. Programs are taking several minutes to open."
+  },
+  {
+    "id": "MSG-005",
+    "sender": "morgan@example.com",
+    "subject": "Account locked",
+    "body": "I entered my password incorrectly several times and now my company account says it is locked."
+  }
+]
