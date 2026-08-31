@@ -1,4 +1,4 @@
-from retriever import retrieve_relevant_sops
+from rag.retriever import retrieve_relevant_sops
 
 
 TEST_QUERIES = [
