@@ -1,7 +1,7 @@
 import json
 
 
-def read_mock_emails(filename="mock_emails.json"):
+def read_mock_emails(filename="data/mock_emails.json"):
     with open(filename, "r", encoding="utf-8") as file:
         emails = json.load(file)
 

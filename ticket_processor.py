@@ -1,5 +1,5 @@
 from ai_analyzer import analyze_ticket
-
+from policy import apply_policy
 
 def create_ticket(sender, subject, body):
     return {
@@ -21,6 +21,7 @@ def process_ticket(ticket):
     ticket_text = build_ticket_text(ticket)
 
     analysis = analyze_ticket(ticket_text)
+    analysis = apply_policy(analysis)
 
     return {
         "ticket": ticket,
