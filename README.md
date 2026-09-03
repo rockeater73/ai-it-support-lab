@@ -1,109 +1,127 @@
 # AI IT Support Automation Lab
 
-I'm building this project to learn how AI could realistically be used in a Tier 1 IT support workflow.
+I'm building this project to explore how AI can be used in a realistic Tier 1 IT support workflow without relying on the model to know or invent company-specific procedures.
 
-The basic idea is to take an incoming support email, find the company's relevant IT procedure, and give that information to a local LLM instead of relying on the model to make up troubleshooting steps.
+The system takes support requests, retrieves relevant IT procedures from a local knowledge base, and provides that context to a locally running LLM. The goal is to automate parts of ticket triage while keeping uncertain and security-sensitive decisions under human control.
 
-## Current Workflow
+## Architecture
 
 ```text
-Outlook Email
-     ↓
+Outlook
+   │
+   ▼
 Microsoft Graph
-     ↓
-Ticket Processing
-     ↓
-SOP Retrieval (RAG)
-     ↓
-Local Llama 3 Model
-     ↓
-Policy Checks
-     ↓
-Tier 1 Guidance / Human Review
+   │
+   ▼
+Email / Ticket Processing
+   │
+   ▼
+Semantic SOP Retrieval
+   │
+   ▼
+Local LLM (Ollama)
+   │
+   ▼
+Policy Validation
+   │
+   ├── Tier 1 Guidance
+   │
+   └── Human Review
 ```
 
-## What Works So Far
+## Current Features
 
-- Reads real emails from a test Outlook inbox using Microsoft Graph
-- Uses OAuth delegated `Mail.Read` permission
-- Stores IT procedures as Markdown files
-- Creates embeddings locally with Ollama
-- Retrieves relevant SOPs using cosine similarity
-- Sends the ticket + retrieved SOPs to Llama 3
-- Separates user troubleshooting from technician actions
-- Sends low-confidence tickets to human review
-- Forces security and critical tickets through additional policy checks
+- Real Outlook email retrieval through Microsoft Graph
+- OAuth authentication with delegated mailbox permissions
+- Markdown-based IT procedure knowledge base
+- Local embeddings and semantic SOP retrieval
+- RAG-grounded ticket analysis using Llama 3
+- Structured priority, category, and troubleshooting output
+- Separation of user-safe and technician-only actions
+- Confidence-based fallback when no relevant SOP is found
+- Deterministic policy checks for security-sensitive tickets
+- Retrieval and adversarial testing
 
-## Example
+## Why I Built It This Way
 
-**Incoming ticket:**
+The project originally started as a simple LLM ticket classifier with predefined troubleshooting logic.
 
-> GlobalProtect says authentication failed, but I can sign into Microsoft 365 normally.
+As I worked on it, I realized that approach wouldn't scale. A real IT team can't hard-code every possible issue an employee might submit. I changed the design so company SOPs could be added as documents and retrieved dynamically using embeddings.
 
-**Retrieved SOPs:**
+That introduced a different problem: semantic search always returns the closest result, even when none of the available documents are actually relevant. An unsupported ticket could therefore retrieve unrelated documentation and give the LLM misleading context. I added a confidence threshold and human-review fallback to handle those cases.
+
+I also separated policy enforcement from the LLM. The model can analyze a ticket, but decisions that should be consistently enforced, such as requiring review of security-related tickets, are handled by application logic instead.
+
+These changes moved the project from a basic classifier toward the architecture below:
 
 ```text
-vpn.md                0.7345
-password_reset.md     0.4110
-printer.md            0.3996
+Untrusted Support Request
+          │
+          ▼
+    SOP Retrieval
+          │
+          ▼
+   Confidence Check
+          │
+          ▼
+     LLM Analysis
+          │
+          ▼
+   Policy Validation
+          │
+     ┌────┴────┐
+     ▼         ▼
+ Tier 1     Human
+ Guidance   Review
 ```
 
-**Result:**
+## Microsoft Graph Integration
+
+The project is being connected to a dedicated Outlook test mailbox to move beyond simulated JSON tickets.
+
+Microsoft Graph currently provides read-only email access using delegated `Mail.Read` permission. The application can authenticate through Microsoft Entra ID and retrieve messages from the test inbox.
+
+The next step is connecting those messages directly to the existing RAG pipeline and generating technician-reviewed response drafts.
+
+## Security
+
+Because both support emails and retrieved documents can contain untrusted content, I'm also using the project to explore security problems specific to LLM-based automation.
+
+Areas being tested include:
+
+- Prompt injection through support requests
+- Malicious or misleading retrieved content
+- Unsupported LLM-generated procedures
+- Unsafe escalation decisions
+- Excessive permissions
+- Risks of allowing model output to trigger automated actions
+
+The LLM is currently advisory. Security policies and future automated actions are intended to be constrained by application logic rather than allowing arbitrary model-generated commands to execute.
+
+## Project Structure
 
 ```text
-Category: VPN
-Priority: High
+knowledge_base/    IT SOPs used for retrieval
+rag/               Embedding, indexing, and retrieval
+tests/             Retrieval and adversarial tests
+data/              Mock development data
 
-User Steps:
-1. Close and reopen the VPN client.
-2. Confirm Microsoft 365 login works.
-3. Get the exact VPN error message.
-
-Human Review: False
+ai_analyzer.py     RAG and LLM analysis
+email_reader.py    Mock email ingestion
+outlook_reader.py  Microsoft Graph email ingestion
+ticket_processor.py
+policy.py          Deterministic policy enforcement
+process_inbox.py   End-to-end ticket processing
 ```
 
-![VPN ticket being processed](docs/images/vpn-demo.png)
+## Technologies
 
-## Things I Changed While Building It
+**Python · Microsoft Graph · Microsoft Entra ID · OAuth · Ollama · Llama 3 · embeddinggemma · RAG · Vector Embeddings · Git**
 
-The first version was basically an LLM ticket classifier. I realized pretty quickly that hard-coding troubleshooting for every possible IT problem wasn't realistic.
+## Current Status
 
-I changed the project to use RAG so the model could reference company procedures instead.
+The core local RAG and policy pipeline is working, and Microsoft Graph can retrieve messages from a dedicated Outlook test mailbox.
 
-That created another problem: semantic search always returns *something*. A webcam ticket was matching unrelated Windows and VPN documentation, and the model was still generating troubleshooting from it.
+I'm currently working on connecting the real mailbox directly to the ticket-processing pipeline. After that, I plan to add human-reviewed response drafting and expand the security/evaluation side of the project.
 
-I added a retrieval-confidence threshold so tickets without a strong SOP match are sent to a human instead.
-
-I also found that the LLM sometimes made escalation decisions I didn't agree with. A phishing ticket was classified correctly as Security but still returned `requires_human_review: False`. I added a separate deterministic policy layer so security and critical tickets don't rely entirely on the model's judgment.
-
-## Testing
-
-Current retrieval test set:
-
-```text
-VPN                  PASS
-Account lockout      PASS
-Printer              PASS
-Phishing             PASS
-Windows performance  PASS
-
-Top-1: 5/5
-```
-
-This is still a very small test set. One of my next goals is to expand it with ambiguous, unsupported, and adversarial tickets instead of treating 5/5 as meaningful production accuracy.
-
-I also have adversarial tests for prompt injection. The early version failed all four initial injection tests, which is something I plan to revisit after the main workflow is complete.
-
-## Tech I'm Using
-
-Python • Ollama • Llama 3 • embeddinggemma • Microsoft Graph • Microsoft Entra ID • OAuth • RAG • Git/GitHub
-
-## Next
-
-- Finish Outlook → RAG processing end-to-end
-- Generate technician-reviewed response drafts
-- Expand the evaluation dataset
-- Re-test prompt injection against the newer architecture
-- Document the security improvements and results
-
-This is a learning project and isn't intended to be a production help desk system.
+This is a learning lab, not a production help desk system.
