@@ -74,11 +74,8 @@ It displays:
 - Original email
 - Retrieval details for troubleshooting/debugging
 
-> Add a screenshot of the dashboard here before publishing the repository.
+> REMINDER: a screenshot of the dashboard here 
 
-```markdown
-![AI IT Support Assistant Dashboard](docs/dashboard.png)
-```
 
 ## Knowledge Base
 
