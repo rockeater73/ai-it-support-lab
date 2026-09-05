@@ -258,8 +258,6 @@ streamlit run dashboard.py
 
 Outlook mode additionally requires a Microsoft Entra application configured for the Microsoft Graph permissions used by the project.
 
-Do not commit application credentials or other secrets to the repository.
-
 ## Why I Built It
 
 I wanted this project to go beyond sending an IT ticket directly to an LLM and displaying whatever it returned.
