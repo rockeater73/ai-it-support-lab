@@ -1,9 +1,14 @@
 import json
 import ollama
 
-from rag.retriever import retrieve_relevant_sops
+from rag.retriever import (
+    retrieve_relevant_sops,
+    load_full_sop
+)
+
 
 MIN_RETRIEVAL_SCORE = 0.45
+
 
 TICKET_SCHEMA = {
     "type": "object",
@@ -65,58 +70,81 @@ SYSTEM_PROMPT = """
 You are an AI assistant supporting a Tier 1 IT help desk.
 
 Your job is to analyze an incoming IT support ticket using the
-company procedures provided to you.
+company procedure provided to you.
 
-The company documentation is the primary source of truth.
+The company procedure is the primary source of truth.
 
 Rules:
 
 1. Base company-specific troubleshooting and technician actions on
-   the supplied documentation.
+   the supplied procedure.
 
-2. Do not invent company procedures.
+2. Do not invent company procedures or troubleshooting steps that are
+   not supported by the supplied procedure.
 
 3. Separate actions an end user can safely perform from actions that
    require an IT technician.
 
 4. Do not tell users to perform administrative or privileged actions.
 
-5. If the supplied documentation does not adequately address the
-   issue, set requires_human_review to true.
+5. If the supplied procedure does not adequately address the issue,
+   set requires_human_review to true.
 
-6. If the documentation says the issue should be escalated, set
-   requires_human_review to true and explain why.
+6. If the procedure says the issue should be escalated, only set
+   requires_human_review to true when the ticket contains evidence that
+   the escalation condition is actually present.
 
 7. Do not claim that an action has already been performed.
 
-8. Do not request passwords, MFA codes, or authentication secrets.
+8. Do not request passwords, MFA codes, recovery codes, or other
+   authentication secrets.
+
+9. Do not treat an escalation condition as satisfied unless the support
+   ticket or documented troubleshooting results provide evidence that
+   the condition is actually present.
+
+10. Do not speculate that an escalation condition may exist solely
+    because it appears in the supplied procedure.
+
+11. If the supplied procedure is only loosely related to the reported
+    issue and does not directly address the reported symptoms, set
+    requires_human_review to true rather than adapting unrelated
+    procedures.
 
 Return only information required by the JSON schema.
 """
 
 
-def build_knowledge_context(retrieval_results):
-    sections = []
-
-    for result in retrieval_results:
-        section = (
-            f"SOURCE: {result['source']}\n"
-            f"SIMILARITY: {result['score']:.4f}\n\n"
-            f"{result['text']}"
-        )
-
-        sections.append(section)
-
-    return "\n\n" + ("=" * 60) + "\n\n".join(sections)
-
 def analyze_ticket(ticket_text):
+    # Step 1: Search individual SOP sections to determine
+    # which SOP best matches the ticket.
     retrieval_results = retrieve_relevant_sops(
         ticket_text,
         top_k=3
     )
 
-    best_score = retrieval_results[0]["score"]
+    # Safety check in case the knowledge index is empty.
+    if not retrieval_results:
+        return {
+            "issue_summary": "No matching SOP found for this ticket.",
+            "category": "Unknown",
+            "priority": "Medium",
+            "matched_procedures": [],
+            "user_steps": [],
+            "technician_actions": [],
+            "requires_human_review": True,
+            "reason": (
+                "No SOPs were available for retrieval. "
+                "Human review is required."
+            ),
+            "retrieval_results": []
+        }
 
+    best_result = retrieval_results[0]
+    best_score = best_result["score"]
+
+    # Step 2: Reject tickets that do not have a sufficiently
+    # relevant SOP match.
     if best_score < MIN_RETRIEVAL_SCORE:
         return {
             "issue_summary": "No matching SOP found for this ticket.",
@@ -133,38 +161,42 @@ def analyze_ticket(ticket_text):
             "retrieval_results": [
                 {
                     "source": result["source"],
-                    "score": round(result["score"], 4)
+                    "chunk": result["chunk"],
+                    "section": result["section"],
+                    "score": round(result["score"], 4),
+                    "text": result["text"]
                 }
                 for result in retrieval_results
             ]
         }
 
-    knowledge_context = build_knowledge_context(
-        retrieval_results
+    # Step 3: Once the best SOP is identified, load the
+    # entire procedure instead of sending only the top chunks.
+    matched_sop = best_result["source"]
+
+    full_sop = load_full_sop(
+        matched_sop
     )
 
-    retrieved_sources = []
-
-    for result in retrieval_results:
-        if result["source"] not in retrieved_sources:
-            retrieved_sources.append(result["source"])
-
+    # Step 4: Give the complete SOP and the ticket to the LLM.
     user_prompt = f"""
-COMPANY DOCUMENTATION
+COMPANY PROCEDURE
 
-{knowledge_context}
+SOURCE: {matched_sop}
+
+{full_sop}
 
 SUPPORT TICKET
 
 {ticket_text}
 
-The documentation above was retrieved automatically because it may
-be relevant to the support ticket.
+Analyze the support ticket using the complete company procedure above.
 
-Analyze the ticket using the retrieved company documentation.
+Only apply escalation conditions when the ticket contains evidence
+that the condition is actually present.
 
-Retrieved source files:
-{", ".join(retrieved_sources)}
+Do not invent troubleshooting steps, administrative actions, or
+company procedures that are not supported by the supplied procedure.
 """
 
     response = ollama.chat(
@@ -189,10 +221,21 @@ Retrieved source files:
         response["message"]["content"]
     )
 
+    # The application already knows which SOP was selected,
+    # so do not rely on the model to report this correctly.
+    analysis["matched_procedures"] = [
+        matched_sop
+    ]
+
+    # Keep retrieval information for testing and the
+    # Streamlit technical-details view.
     analysis["retrieval_results"] = [
         {
             "source": result["source"],
-            "score": round(result["score"], 4)
+            "chunk": result["chunk"],
+            "section": result["section"],
+            "score": round(result["score"], 4),
+            "text": result["text"]
         }
         for result in retrieval_results
     ]
