@@ -76,6 +76,8 @@ It displays:
 
 ![Outlook ticket dashboard](docs/images/streamlit-ticket-dashboard.png)
 
+![Retrieval information](docs/images/retrieval-details.png)
+
 ## Knowledge Base
 
 The current knowledge base contains procedures for:
@@ -155,6 +157,8 @@ The Streamlit dashboard can switch between:
 - Outlook
 
 This lets the AI/RAG pipeline be developed without requiring a live mailbox for every test.
+
+![Entra API Permissions](docs/images/entra-API-permissions.png)
 
 ## Safety and Human Review
 
