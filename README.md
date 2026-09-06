@@ -74,8 +74,7 @@ It displays:
 - Original email
 - Retrieval details for troubleshooting/debugging
 
-> REMINDER: a screenshot of the dashboard here 
-
+![Outlook ticket dashboard](docs/images/Streamlit Ticket Dashboard Example.png)
 
 ## Knowledge Base
 
